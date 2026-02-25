@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>婚禮座位編排助手專業版</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: #FDF8F9; }
+        .table-circle { transition: all 0.3s ease; }
+        .guest-item:hover { border-color: #f472b6; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const App = () => {
+            const [guests, setGuests] = useState([]);
+            const [tables, setTables] = useState([
+                { id: 'table-1', name: '主桌 (男方)', capacity: 12 },
+                { id: 'table-2', name: '主桌 (女方)', capacity: 12 }
+            ]);
+            const [newGuestName, setNewGuestName] = useState('');
+
+            // 確保每次渲染後 Lucide 圖示都能正確載入
+            useEffect(() => {
+                if (window.lucide) {
+                    window.lucide.createIcons();
+                }
+            }, [guests, tables]);
+
+            const handleAddGuest = (e) => {
+                e.preventDefault();
+                if (!newGuestName.trim()) return;
+                setGuests([...guests, { id: `guest-${Date.now()}`, name: newGuestName.trim(), tableId: null }]);
+                setNewGuestName('');
+            };
+
+            const handleAddTable = () => {
+                const newId = `table-${Date.now()}`;
+                setTables([...tables, { id: newId, name: `第 ${tables.length + 1} 桌`, capacity: 10 }]);
+            };
+
+            const updateTable = (id, updates) => {
+                setTables(tables.map(t => t.id === id ? { ...t, ...updates } : t));
+            };
+
+            const removeTable = (id) => {
+                if(confirm("確定刪除此桌？賓客將回到未分配名單")) {
+                    setTables(tables.filter(t => t.id !== id));
+                    setGuests(guests.map(g => g.tableId === id ? { ...g, tableId: null } : g));
+                }
+            };
+
+            const moveToTable = (guestId, tableId) => {
+                if (tableId) {
+                    const targetTable = tables.find(t => t.id === tableId);
+                    const count = guests.filter(g => g.tableId === tableId).length;
+                    if (count >= targetTable.capacity) {
+                        alert("此桌已滿！");
+                        return;
+                    }
+                }
+                setGuests(guests.map(g => g.id === guestId ? { ...g, tableId: tableId } : g));
+            };
+
+            const removeGuest = (id) => setGuests(guests.filter(g => g.id !== id));
+
+            const exportList = () => {
+                let text = "婚禮座位編排清單\n================\n\n";
+                tables.forEach(t => {
+                    const gs = guests.filter(g => g.tableId === t.id);
+                    text += `【${t.name}】(${gs.length}/${t.capacity})\n` + (gs.map((g,i)=>`${i+1}. ${g.name}`).join("\n") || "- 尚無賓客") + "\n\n";
+                });
+                const blob = new Blob([text], {type: 'text/plain'});
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `婚禮座位表.txt`;
+                a.click();
+            };
+
+            return (
+                <div className="max-w-7xl mx-auto p-4 md:p-8">
+                    <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+                        <div>
+                            <h1 className="text-3xl font-black text-slate-800 flex items-center gap-2">
+                                <i data-lucide="layout-grid" className="text-pink-500"></i> 婚禮座位編排助手
+                            </h1>
+                            <p className="text-slate-500">點擊桌名或人數可直接修改</p>
+                        </div>
+                        <div className="flex gap-3">
+                            <div className="bg-white p-3 rounded-xl shadow-sm border border-pink-100 text-sm">
+                                總人數: <span className="font-bold text-pink-500">{guests.length}</span> | 
+                                未入座: <span className="font-bold text-orange-500">{guests.filter(g=>!g.tableId).length}</span>
+                            </div>
+                            <button onClick={exportList} className="bg-white border p-3 rounded-xl hover:bg-slate-50 flex items-center gap-2">
+                                <i data-lucide="file-down" style={{width: '18px', height: '18px'}}></i> 匯出清單
+                            </button>
+                        </div>
+                    </header>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                        {/* 賓客清單 */}
+                        <div className="lg:col-span-3 bg-white p-6 rounded-2xl shadow-sm border h-[calc(100vh-200px)] flex flex-col">
+                            <h2 className="font-bold mb-4 flex items-center gap-2"><i data-lucide="users"></i> 賓客名單</h2>
+                            <form onSubmit={handleAddGuest} className="relative mb-4">
+                                <input 
+                                    className="w-full p-3 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-pink-300"
+                                    placeholder="輸入姓名..."
+                                    value={newGuestName}
+                                    onChange={e => setNewGuestName(e.target.value)}
+                                />
+                                <button className="absolute right-2 top-2 bg-pink-500 text-white p-1.5 rounded-lg"><i data-lucide="plus"></i></button>
+                            </form>
+                            <div className="flex-1 overflow-y-auto space-y-2">
+                                {guests.filter(g => !g.tableId).map(g => (
+                                    <div key={g.id} className="flex items-center justify-between p-3 bg-slate-50 border rounded-lg group">
+                                        <span className="font-medium">{g.name}</span>
+                                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <select 
+                                                className="text-xs border rounded p-1"
+                                                onChange={(e) => moveToTable(g.id, e.target.value)}
+                                                value=""
+                                            >
+                                                <option value="" disabled>入座...</option>
+                                                {tables.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                            </select>
+                                            <button onClick={() => removeGuest(g.id)} className="text-red-400 p-1"><i data-lucide="trash-2" style={{width: '14px', height: '14px'}}></i></button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* 桌位圖 */}
+                        <div className="lg:col-span-9">
+                            <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-xl font-bold">座位平面圖</h2>
+                                <button onClick={handleAddTable} className="bg-slate-800 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2">
+                                    <i data-lucide="plus"></i> 新增桌次
+                                </button>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                                {tables.map(t => {
+                                    const tGuests = guests.filter(g => g.tableId === t.id);
+                                    const isFull = tGuests.length >= t.capacity;
+                                    return (
+                                        <div key={t.id} className={`bg-white p-6 rounded-2xl border-2 transition-all min-h-[350px] shadow-sm ${isFull ? 'border-green-200' : 'border-slate-100'}`}>
+                                            <div className="flex justify-between items-start mb-4">
+                                                <div>
+                                                    <input 
+                                                        className="font-bold text-slate-800 border-none bg-transparent focus:ring-0 w-full"
+                                                        value={t.name}
+                                                        onChange={e => updateTable(t.id, {name: e.target.value})}
+                                                    />
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <span className="text-xs bg-slate-100 px-2 py-0.5 rounded-full">{tGuests.length} 人</span>
+                                                        <span className="text-xs text-slate-400">上限:</span>
+                                                        <input 
+                                                            type="number" className="w-10 text-xs border rounded px-1" 
+                                                            value={t.capacity}
+                                                            onChange={e => updateTable(t.id, {capacity: parseInt(e.target.value) || 1})}
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <button onClick={() => removeTable(t.id)} className="text-slate-300 hover:text-red-400"><i data-lucide="trash-2" style={{width: '18px', height: '18px'}}></i></button>
+                                            </div>
+
+                                            <div className={`relative w-40 h-40 mx-auto rounded-full flex items-center justify-center border-4 ${isFull ? 'bg-green-50 border-green-100' : 'bg-slate-50 border-slate-100'}`}>
+                                                <div className="text-[10px] text-slate-400 font-bold">{isFull ? "滿座" : "尚有空位"}</div>
+                                                {tGuests.map((g, idx) => {
+                                                    const angle = (idx / Math.max(tGuests.length, t.capacity)) * 2 * Math.PI;
+                                                    const left = 50 + 40 * Math.cos(angle) + "%";
+                                                    const top = 50 + 40 * Math.sin(angle) + "%";
+                                                    return (
+                                                        <div key={g.id} className="absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 group" style={{left, top}}>
+                                                            <div className="w-full h-full bg-pink-500 text-white text-[8px] rounded-full flex items-center justify-center border-2 border-white shadow-sm cursor-pointer" onClick={() => moveToTable(g.id, null)}>
+                                                                {g.name.substring(0, 2)}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                            <div className="mt-6 space-y-1 border-t pt-2">
+                                                {tGuests.map(g => (
+                                                    <div key={g.id} className="flex justify-between text-xs p-1 bg-slate-50 rounded">
+                                                        <span>{g.name}</span>
+                                                        <button onClick={() => moveToTable(g.id, null)} className="text-slate-400">移除</button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
